@@ -1,0 +1,164 @@
+#include <Wire.h>
+#include <DHT.h>
+#include <LiquidCrystal_I2C.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+// ==========================================
+// PIN CONFIGURATION (Matches your table)
+// ==========================================
+const int pinDHT = 2;     // D2
+const int pinRelay = 7;   // D7
+const int pinBuzzer = 8;  // D8
+const int pinEcho = 9;    // D9
+const int pinTrig = 10;   //                                                      
+const int pinLED = 13;    // D13
+// Note: LCD and OLED both connect to A4 (SDA) and A5 (SCL)
+
+// ==========================================
+// TANK DIMENSIONS (Calibrated for your mug)
+// ==========================================
+const int TANK_FULL_DISTANCE = 3;   // Stop pump when water is 3cm from sensor
+const int TANK_EMPTY_DISTANCE = 11; // Mug bottom is roughly 11cm from sensor
+
+// ==========================================
+// DEVICE INITIALIZATION
+// ==========================================
+#define DHTTYPE DHT11
+DHT dht(pinDHT, DHTTYPE);
+
+// LCD setup (Standard address 0x27, 16 columns, 2 rows)
+LiquidCrystal_I2C lcd(0x27, 16, 2); 
+
+// OLED setup (Standard address 0x3C, 128x64 pixels)
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+Adafruit_SSD1306 oled(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+void setup() {
+  // Initialize Serial Monitor
+  Serial.begin(9600);
+  Serial.println(F("Smart Water Tank Controller Initializing..."));
+
+  // Initialize Digital Pins
+  pinMode(pinRelay, OUTPUT);
+  pinMode(pinBuzzer, OUTPUT);
+  pinMode(pinLED, OUTPUT);
+  pinMode(pinTrig, OUTPUT);
+  pinMode(pinEcho, INPUT);
+
+  // Default states (Pump/Relay OFF initially)
+  digitalWrite(pinRelay, LOW); 
+  digitalWrite(pinLED, LOW);
+  digitalWrite(pinBuzzer, LOW);
+
+  // Initialize Sensors & Displays
+  dht.begin();
+  lcd.init();
+  lcd.backlight();
+  
+  if(!oled.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { 
+    Serial.println(F("OLED allocation failed. Check wiring/address!"));
+  }
+  
+  oled.clearDisplay();
+  oled.setTextColor(WHITE);
+  
+  // Welcome Splash Screen
+  lcd.setCursor(0, 0);
+  lcd.print("  Smart Tank  ");
+  lcd.setCursor(0, 1);
+  lcd.print("  System Ready  ");
+  delay(2000);
+  lcd.clear();
+}
+
+void loop() {
+  // 1. Read DHT11 Climate Data
+  float humidity = dht.readHumidity();
+  float temperature = dht.readTemperature(); // Reading in Celsius
+
+  // 2. Read Ultrasonic Distance Data
+  digitalWrite(pinTrig, LOW);
+  delayMicroseconds(2);
+  digitalWrite(pinTrig, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(pinTrig, LOW);
+  
+  long duration = pulseIn(pinEcho, HIGH);
+  float distance = duration * 0.034 / 2; // Convert time to centimeters
+
+  // Guard clause: skip processing if sensors return error/impossible values
+if (isnan(humidity) || isnan(temperature) || distance <= 0) { 
+    Serial.println(F("Sensor read error! Retrying next loop..."));
+    delay(1000);
+    return;
+  }
+
+  // 3. Calculate Water Level Percentage
+  // Keep distance strictly within empty/full boundaries to prevent erratic percentages
+  float constrainedDistance = constrain(distance, TANK_FULL_DISTANCE, TANK_EMPTY_DISTANCE);
+  int waterLevelPct = map(constrainedDistance, TANK_EMPTY_DISTANCE, TANK_FULL_DISTANCE, 0, 100);
+
+  // 4. Automatic Pump Control & Safety Alarm Logic
+  // Turn pump ON if the water falls to or below 20%
+  if (waterLevelPct <= 20) {
+    digitalWrite(pinRelay, HIGH); // Turn pump ON
+    digitalWrite(pinLED, HIGH);   // Indicator LED ON
+    
+    // Quick warning beep for low water level
+    digitalWrite(pinBuzzer, HIGH);
+    delay(100);
+    digitalWrite(pinBuzzer, LOW);
+  } 
+  // Turn pump OFF if water level reaches or exceeds 95%
+  else if (waterLevelPct >= 95) {
+    digitalWrite(pinRelay, LOW);  // Turn pump OFF
+    digitalWrite(pinLED, LOW);    // Indicator LED OFF
+    
+    // Continuous alarm trigger if critical overflow threshold hit (>98%)
+    if (waterLevelPct >= 98) {
+      digitalWrite(pinBuzzer, HIGH);
+    } else {
+      digitalWrite(pinBuzzer, LOW);
+    }
+  } else {
+    // Normal middle-range operation: safe, turn off buzzer alarm
+    digitalWrite(pinBuzzer, LOW);
+  }
+
+  // 5. Output Data to Serial Monitor
+  Serial.print(F("Distance: ")); Serial.print(distance); Serial.print(F(" cm | "));
+  Serial.print(F("Water Level: ")); Serial.print(waterLevelPct); Serial.print(F("% | "));
+  Serial.print(F("Temp: ")); Serial.print(temperature); Serial.print(F(" C | "));
+  Serial.print(F("Hum: ")); Serial.print(humidity); Serial.println(F("%"));
+
+  // 6. Display Water Tank Status on LCD Display
+  lcd.setCursor(0, 0);
+  lcd.print("Water Lvl: ");
+  lcd.print(waterLevelPct);
+  lcd.print("%   "); // Extra spacing wipes out leftover overlapping digits
+  
+  lcd.setCursor(0, 1);
+  lcd.print("Pump: ");
+  lcd.print(digitalRead(pinRelay) == HIGH ? "RUNNING" : "STOPPED");
+  lcd.print("       ");
+
+  // 7. Display Ambient Climate Status on OLED Display
+  oled.clearDisplay();
+  oled.setTextSize(1);
+  oled.setCursor(0, 0);
+  oled.print("ENVIRONMENT MONITOR");
+  oled.drawFastHLine(0, 12, 128, WHITE);
+  
+  oled.setTextSize(2);
+  oled.setCursor(0, 22);
+  oled.print("T: "); oled.print(temperature, 1); oled.print(" C");
+  
+  oled.setCursor(0, 46);
+  oled.print("H: "); oled.print(humidity, 0); oled.print(" %");
+  oled.display();
+
+  // Refresh interval (1 second loop delay)
+  delay(1000);
+} 
