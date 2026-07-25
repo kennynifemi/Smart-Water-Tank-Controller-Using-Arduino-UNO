@@ -1,0 +1,89 @@
+# 💧 Smart Water Tank Controller Using Arduino UNO
+
+An embedded systems project that automatically monitors water level and environmental conditions while simulating automatic pump control.
+
+---
+
+## 📌 Project Overview
+
+This project uses an Arduino UNO to monitor the water level inside a storage tank using an HC-SR04 ultrasonic sensor. It also measures ambient temperature and humidity using a DHT11 sensor.
+
+Based on the measured water level, the system automatically controls a relay (representing a water pump), provides visual and audible alerts, and displays real-time information on both a 16×2 LCD and a 0.96" OLED display.
+
+This project demonstrates practical applications of Embedded Systems, Sensor Integration, and IoT-ready automation.
+
+---
+
+## Features
+
+- Water level measurement
+- Water level percentage calculation
+- Automatic pump control using relay
+- Temperature monitoring
+- Humidity monitoring
+- OLED dashboard
+- LCD status display
+- Low water alarm using buzzer
+- LED status indicator
+- Real-time sensor monitoring
+
+---
+
+## Components Used
+
+- Arduino UNO
+- HC-SR04 Ultrasonic Sensor
+- DHT11 Temperature & Humidity Sensor
+- 16×2 I2C LCD Display
+- 0.96" I2C OLED Display
+- Relay Module
+- Active Buzzer
+- LED
+- Breadboard
+- Jumper Wires
+- USB Cable
+
+---
+
+## System Workflow
+
+1. Measure the distance between the ultrasonic sensor and the water surface.
+2. Convert the measured distance into water level percentage.
+3. Read temperature and humidity from the DHT11 sensor.
+4. Display all information on the LCD and OLED.
+5. Turn ON the relay when the water level becomes low.
+6. Activate the buzzer when the water reaches the critical level.
+7. Turn OFF the relay when the tank reaches the desired level.
+
+---
+
+## Pin Connections
+
+| Component | Arduino Pin |
+|-----------|-------------|
+| HC-SR04 Trigger | D10 |
+| HC-SR04 Echo | D9 |
+| Relay | D7 |
+| Buzzer | D8 |
+| LED | D13 |
+| DHT11 | D2 |
+| LCD SDA | A4 |
+| LCD SCL | A5 |
+| OLED SDA | A4 |
+| OLED SCL | A5 |
+
+---
+
+## Technologies Used
+
+- Arduino IDE
+- Embedded C/C++
+- I2C Communication
+- Sensor Integration
+- Automation Logic
+
+---
+
+## License
+
+This project is open source and available for educational purposes.
